@@ -219,6 +219,13 @@ class SO100Follower(Robot):
 
         # Send goal position to the arm
         self.bus.sync_write("Goal_Position", goal_pos)
+        
+        # IMPORTANT: Feetech motors need Goal_Velocity set to move!
+        # Without this, motors will lock in place with Lock=1 but won't execute movement.
+        # Default velocity of 150 provides gentle, smooth movement (~3.7% of 4096 range)
+        goal_vel = {motor: 150 for motor in goal_pos}
+        self.bus.sync_write("Goal_Velocity", goal_vel)
+        
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 
     def disconnect(self):

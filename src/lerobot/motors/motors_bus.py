@@ -674,12 +674,17 @@ class MotorsBus(abc.ABC):
         elif not isinstance(motors, list):
             raise TypeError(motors)
 
+        import time
         for motor in motors:
             model = self._get_motor_model(motor)
             max_res = self.model_resolution_table[model] - 1
-            self.write("Homing_Offset", motor, 0, normalize=False)
-            self.write("Min_Position_Limit", motor, 0, normalize=False)
-            self.write("Max_Position_Limit", motor, max_res, normalize=False)
+            # EPROM writes need retries and delays
+            self.write("Homing_Offset", motor, 0, normalize=False, num_retry=3)
+            time.sleep(0.05)  # Delay between EPROM writes
+            self.write("Min_Position_Limit", motor, 0, normalize=False, num_retry=3)
+            time.sleep(0.05)  # Delay between EPROM writes
+            self.write("Max_Position_Limit", motor, max_res, normalize=False, num_retry=3)
+            time.sleep(0.05)  # Delay after each motor
 
         self.calibration = {}
 
@@ -702,11 +707,15 @@ class MotorsBus(abc.ABC):
         elif not isinstance(motors, list):
             raise TypeError(motors)
 
+        import time
         self.reset_calibration(motors)
-        actual_positions = self.sync_read("Present_Position", motors, normalize=False)
+        # Add retry for position read during calibration
+        actual_positions = self.sync_read("Present_Position", motors, normalize=False, num_retry=3)
         homing_offsets = self._get_half_turn_homings(actual_positions)
         for motor, offset in homing_offsets.items():
-            self.write("Homing_Offset", motor, offset)
+            # EPROM write needs retry and delay
+            self.write("Homing_Offset", motor, offset, num_retry=3)
+            time.sleep(0.05)
 
         return homing_offsets
 
@@ -738,15 +747,19 @@ class MotorsBus(abc.ABC):
         elif not isinstance(motors, list):
             raise TypeError(motors)
 
-        start_positions = self.sync_read("Present_Position", motors, normalize=False)
+        import time
+        start_positions = self.sync_read("Present_Position", motors, normalize=False, num_retry=3)
         mins = start_positions.copy()
         maxes = start_positions.copy()
 
         user_pressed_enter = False
         while not user_pressed_enter:
-            positions = self.sync_read("Present_Position", motors, normalize=False)
+            # Add retries for sync_read during calibration (motor movement can cause comm issues)
+            positions = self.sync_read("Present_Position", motors, normalize=False, num_retry=3)
             mins = {motor: min(positions[motor], min_) for motor, min_ in mins.items()}
             maxes = {motor: max(positions[motor], max_) for motor, max_ in maxes.items()}
+            # Small delay to prevent bus overload during continuous reading
+            time.sleep(0.01)
 
             if display_values:
                 print("\n-------------------------------------------")

@@ -271,11 +271,15 @@ class FeetechMotorsBus(MotorsBus):
         return calibration
 
     def write_calibration(self, calibration_dict: dict[str, MotorCalibration], cache: bool = True) -> None:
+        import time
         for motor, calibration in calibration_dict.items():
             if self.protocol_version == 0:
-                self.write("Homing_Offset", motor, calibration.homing_offset)
-            self.write("Min_Position_Limit", motor, calibration.range_min)
-            self.write("Max_Position_Limit", motor, calibration.range_max)
+                self.write("Homing_Offset", motor, calibration.homing_offset, num_retry=3)
+                time.sleep(0.05)  # Small delay between EPROM writes
+            self.write("Min_Position_Limit", motor, calibration.range_min, num_retry=3)
+            time.sleep(0.05)  # Small delay between EPROM writes
+            self.write("Max_Position_Limit", motor, calibration.range_max, num_retry=3)
+            time.sleep(0.05)  # Small delay after each motor
 
         if cache:
             self.calibration = calibration_dict

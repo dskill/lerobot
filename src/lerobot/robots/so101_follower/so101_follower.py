@@ -120,6 +120,10 @@ class SO101Follower(Robot):
 
         logger.info(f"\nRunning calibration of {self}")
         self.bus.disable_torque()
+        # Unlock EPROM immediately for calibration writes
+        for motor in self.bus.motors:
+            self.bus.write("Lock", motor, 0, num_retry=2)
+        time.sleep(0.2)  # Give motors time to unlock EPROM
         for motor in self.bus.motors:
             self.bus.write("Operating_Mode", motor, OperatingMode.POSITION.value)
 
@@ -142,6 +146,14 @@ class SO101Follower(Robot):
                 range_max=range_maxes[motor],
             )
 
+        # Ensure torque is disabled and EPROM is unlocked before writing calibration
+        self.bus.disable_torque()
+        # Unlock EPROM for writing by setting Lock=0 with retries
+        for motor in self.bus.motors:
+            self.bus.write("Lock", motor, 0, num_retry=2)
+        # Longer delay to ensure motors process the unlock command and are ready for EPROM writes
+        time.sleep(0.5)
+        
         self.bus.write_calibration(self.calibration)
         self._save_calibration()
         print("Calibration saved to", self.calibration_fpath)
@@ -217,6 +229,13 @@ class SO101Follower(Robot):
 
         # Send goal position to the arm
         self.bus.sync_write("Goal_Position", goal_pos)
+        
+        # IMPORTANT: Feetech motors need Goal_Velocity set to move!
+        # Without this, motors will lock in place with Lock=1 but won't execute movement.
+        # Default velocity of 150 provides gentle, smooth movement (~3.7% of 4096 range)
+        goal_vel = {motor: 10 for motor in goal_pos}
+        self.bus.sync_write("Goal_Velocity", goal_vel)
+        
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 
     def disconnect(self):
