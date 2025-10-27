@@ -105,3 +105,5 @@ else:
     print("→ Check power supply and Waveshare board connections")
     print("→ The board might have a blown fuse or damaged power circuit")
 
+
+

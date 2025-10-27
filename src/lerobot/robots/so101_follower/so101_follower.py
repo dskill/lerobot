@@ -236,7 +236,7 @@ class SO101Follower(Robot):
         # Velocity: 400 provides smooth, natural movement (~10% of 4096 range)
         # Acceleration: 50 provides smooth acceleration/deceleration
         goal_vel = {motor: 600 for motor in goal_pos}
-        goal_acc = {motor: 20 for motor in goal_pos}
+        goal_acc = {motor: 25 for motor in goal_pos}
         self.bus.sync_write("Goal_Velocity", goal_vel)
         self.bus.sync_write("Acceleration", goal_acc)
         
