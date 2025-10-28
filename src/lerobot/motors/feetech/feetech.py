@@ -137,11 +137,26 @@ class FeetechMotorsBus(MotorsBus):
         import scservo_sdk as scs
 
         self.port_handler = scs.PortHandler(self.port)
-        # HACK: monkeypatch
+        # HACK: monkeypatch setPacketTimeout
         self.port_handler.setPacketTimeout = patch_setPacketTimeout.__get__(
             self.port_handler, scs.PortHandler
         )
         self.packet_handler = scs.PacketHandler(protocol_version)
+        
+        # HACK: monkeypatch missing methods for new SDK compatibility
+        # In feetech-servo-sdk v1.0.0, GroupSyncWrite/Read call methods on port_handler
+        # that don't exist - they're in protocol_packet_handler instead
+        # We need to create a protocol_packet_handler and delegate to it
+        if not hasattr(self.port_handler, 'syncWriteTxOnly'):
+            protocol_handler = scs.protocol_packet_handler(self.port_handler, scs.SCS_END)
+            # Add methods needed by GroupSyncWrite
+            self.port_handler.syncWriteTxOnly = protocol_handler.syncWriteTxOnly
+            # Add methods needed by GroupSyncRead
+            self.port_handler.syncReadTx = protocol_handler.syncReadTx
+            self.port_handler.syncReadRx = protocol_handler.syncReadRx
+            self.port_handler.scs_makeword = protocol_handler.scs_makeword
+            self.port_handler.scs_makedword = protocol_handler.scs_makedword
+        
         self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
         self.sync_writer = scs.GroupSyncWrite(self.port_handler, 0, 0)
         self._comm_success = scs.COMM_SUCCESS

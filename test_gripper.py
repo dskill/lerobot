@@ -35,6 +35,13 @@ if not torque_status:
     torque_status = bus.read("Torque_Enable", "gripper", normalize=False)
     print(f"Torque status now: {'ENABLED' if torque_status else 'DISABLED'}")
 
+# Set velocity and acceleration ONCE at startup (they persist!)
+print("Setting Goal_Velocity=600 and Acceleration=20...")
+bus.write("Goal_Velocity", "gripper", 600, normalize=False)
+bus.write("Acceleration", "gripper", 20, normalize=False)
+time.sleep(0.05)
+print("✓ Movement parameters configured")
+
 # Read initial position (without normalization since we don't have calibration loaded)
 initial_pos = bus.read("Present_Position", "gripper", normalize=False)
 print(f"Initial gripper position (raw): {initial_pos}")
