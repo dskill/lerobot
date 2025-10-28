@@ -53,439 +53,636 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>SO-101 Robot Control</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>CEDARBOT SO-101</title>
+    <meta name="viewport" content="width=800, initial-scale=1.0, user-scalable=no">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.97; }
         }
 
         body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow: hidden;
+            width: 800px;
+            height: 480px;
+            position: relative;
+            text-shadow: 0 0 5px #0f0;
+        }
+
+        /* CRT Scanlines */
+        body::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            pointer-events: none;
+            z-index: 1000;
+            animation: flicker 0.15s infinite;
+        }
+
+        /* CRT Glow */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.3) 100%);
+            pointer-events: none;
+            z-index: 999;
         }
 
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 800px;
+            height: 480px;
+            padding: 15px;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            gap: 10px;
         }
 
-        h1 {
+        .header {
             text-align: center;
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 2.5em;
+            border: 2px solid #0f0;
+            padding: 8px;
+            background: rgba(0, 255, 0, 0.05);
         }
 
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 1.1em;
+        .header h1 {
+            font-size: 20px;
+            letter-spacing: 4px;
+            margin-bottom: 3px;
         }
 
         .status {
+            font-size: 11px;
+            letter-spacing: 2px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 180px 180px 1fr 120px;
+            gap: 10px;
+        }
+
+        .control-section {
+            border: 2px solid #0f0;
+            padding: 8px;
+            background: rgba(0, 255, 0, 0.02);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-title {
+            font-size: 10px;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
             text-align: center;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            font-weight: bold;
-            font-size: 1.1em;
+            border-bottom: 1px solid #0f0;
+            padding-bottom: 4px;
         }
 
-        .status.connected {
-            background: #d4edda;
-            color: #155724;
-            border: 2px solid #c3e6cb;
+        /* XY Pad Controller */
+        .xy-pad {
+            width: 160px;
+            height: 160px;
+            border: 2px solid #0f0;
+            position: relative;
+            background: rgba(0, 255, 0, 0.05);
+            margin: auto;
+            cursor: crosshair;
         }
 
-        .status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
-            border: 2px solid #f5c6cb;
+        .xy-pad::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(0, 255, 0, 0.3);
         }
 
-        .motor-control {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 2px solid #e9ecef;
-            transition: all 0.3s ease;
+        .xy-pad::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(0, 255, 0, 0.3);
         }
 
-        .motor-control:hover {
-            border-color: #667eea;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        .xy-cursor {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #0f0;
+            border-radius: 50%;
+            background: rgba(0, 255, 0, 0.3);
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #0f0;
+            pointer-events: none;
         }
 
-        .motor-header {
+        .xy-labels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            margin-top: 5px;
+            font-size: 10px;
+        }
+
+        .xy-label {
+            text-align: center;
+            padding: 3px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        /* Rotary Knob */
+        .knob-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .knob {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .knob-circle {
+            width: 100%;
+            height: 100%;
+            border: 3px solid #0f0;
+            border-radius: 50%;
+            background: rgba(0, 255, 0, 0.05);
+            position: relative;
+        }
+
+        .knob-indicator {
+            position: absolute;
+            width: 4px;
+            height: 45%;
+            background: #0f0;
+            top: 5%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%);
+            box-shadow: 0 0 5px #0f0;
+        }
+
+        .knob-value {
+            text-align: center;
+            font-size: 16px;
+            padding: 4px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+        }
+
+        /* Sliders */
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-item {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .slider-label {
+            font-size: 10px;
+            letter-spacing: 1px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
         }
 
-        .motor-name {
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #495057;
+        .slider-track {
+            height: 20px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid #0f0;
+            position: relative;
+            cursor: pointer;
         }
 
-        .motor-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-            min-width: 80px;
-            text-align: right;
+        .slider-fill {
+            height: 100%;
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            transition: width 0.1s;
         }
 
-        .slider-container {
+        .slider-thumb {
+            position: absolute;
+            width: 4px;
+            height: 100%;
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+            transition: left 0.1s;
+            pointer-events: none;
+        }
+
+        /* Gripper Control */
+        .gripper-buttons {
             display: flex;
-            gap: 15px;
-            align-items: center;
+            gap: 5px;
+            margin-top: auto;
         }
 
-        input[type="range"] {
+        .btn {
             flex: 1;
-            height: 8px;
-            border-radius: 5px;
-            background: #d3d3d3;
-            outline: none;
-            -webkit-appearance: none;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: #667eea;
+            padding: 10px;
+            border: 2px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
             cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            letter-spacing: 1px;
+            transition: all 0.1s;
         }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: #667eea;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        .btn:active {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: inset 0 0 10px #0f0;
         }
 
-        .preset-buttons {
+        .footer {
             display: flex;
             gap: 10px;
-            margin-top: 10px;
         }
 
-        button {
+        .emergency-btn {
             flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1em;
+            padding: 15px;
+            border: 3px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
             font-weight: bold;
+            letter-spacing: 3px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
+            transition: all 0.1s;
         }
 
-        .btn-center {
-            background: #667eea;
-        }
-
-        .btn-min {
-            background: #28a745;
-        }
-
-        .btn-max {
-            background: #dc3545;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        .emergency-stop {
-            margin-top: 30px;
-            padding: 20px;
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.3em;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-        }
-
-        .emergency-stop:hover {
-            background: #c82333;
-        }
-
-        .range-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9em;
-            color: #6c757d;
-            margin-top: 5px;
+        .emergency-btn:active {
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: inset 0 0 20px #0f0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🤖 SO-101 Robot Control</h1>
-        <p class="subtitle">Follower Arm Web Interface</p>
-
-        <div id="status" class="status connected">
-            ✅ Connected
+        <div class="header">
+            <h1>SO-101 CONTROL SYSTEM</h1>
+            <div class="status" id="status">[ SYSTEM ONLINE ]</div>
         </div>
 
-        <!-- Shoulder Pan -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Shoulder Pan</div>
-                <div class="motor-value" id="shoulder_pan_value">0</div>
+        <div class="main-grid">
+            <!-- Shoulder XY Control -->
+            <div class="control-section">
+                <div class="section-title">SHOULDER</div>
+                <div class="xy-pad" id="shoulder-pad" data-x="shoulder_pan" data-y="shoulder_lift">
+                    <div class="xy-cursor" id="shoulder-cursor"></div>
+                </div>
+                <div class="xy-labels">
+                    <div class="xy-label">PAN: <span id="shoulder_pan_value">0</span></div>
+                    <div class="xy-label">LIFT: <span id="shoulder_lift_value">0</span></div>
+                </div>
             </div>
-            <div class="slider-container">
-                <input type="range" id="shoulder_pan" min="-100" max="100" value="0" step="1">
-            </div>
-            <div class="range-labels">
-                <span>-100</span>
-                <span>0</span>
-                <span>100</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('shoulder_pan', -100)">Min</button>
-                <button class="btn-center" onclick="setMotor('shoulder_pan', 0)">Center</button>
-                <button class="btn-max" onclick="setMotor('shoulder_pan', 100)">Max</button>
-            </div>
-        </div>
 
-        <!-- Shoulder Lift -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Shoulder Lift</div>
-                <div class="motor-value" id="shoulder_lift_value">0</div>
+            <!-- Wrist XY Control -->
+            <div class="control-section">
+                <div class="section-title">WRIST</div>
+                <div class="xy-pad" id="wrist-pad" data-x="wrist_roll" data-y="wrist_flex">
+                    <div class="xy-cursor" id="wrist-cursor"></div>
+                </div>
+                <div class="xy-labels">
+                    <div class="xy-label">ROLL: <span id="wrist_roll_value">0</span></div>
+                    <div class="xy-label">FLEX: <span id="wrist_flex_value">0</span></div>
+                </div>
             </div>
-            <div class="slider-container">
-                <input type="range" id="shoulder_lift" min="-100" max="100" value="0" step="1">
-            </div>
-            <div class="range-labels">
-                <span>-100</span>
-                <span>0</span>
-                <span>100</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('shoulder_lift', -100)">Min</button>
-                <button class="btn-center" onclick="setMotor('shoulder_lift', 0)">Center</button>
-                <button class="btn-max" onclick="setMotor('shoulder_lift', 100)">Max</button>
-            </div>
-        </div>
 
-        <!-- Elbow Flex -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Elbow Flex</div>
-                <div class="motor-value" id="elbow_flex_value">0</div>
+            <!-- Sliders Section -->
+            <div class="control-section">
+                <div class="section-title">LINEAR</div>
+                <div class="slider-group">
+                    <div class="slider-item">
+                        <div class="slider-label">
+                            <span>ELBOW</span>
+                            <span id="elbow_flex_value">0</span>
+                        </div>
+                        <div class="slider-track" data-motor="elbow_flex">
+                            <div class="slider-fill" id="elbow_flex_fill"></div>
+                            <div class="slider-thumb" id="elbow_flex_thumb"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="slider-container">
-                <input type="range" id="elbow_flex" min="-100" max="100" value="0" step="1">
-            </div>
-            <div class="range-labels">
-                <span>-100</span>
-                <span>0</span>
-                <span>100</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('elbow_flex', -100)">Min</button>
-                <button class="btn-center" onclick="setMotor('elbow_flex', 0)">Center</button>
-                <button class="btn-max" onclick="setMotor('elbow_flex', 100)">Max</button>
+
+            <!-- Gripper -->
+            <div class="control-section">
+                <div class="section-title">GRIPPER</div>
+                <div class="knob" id="gripper-knob">
+                    <div class="knob-circle">
+                        <div class="knob-indicator" id="gripper-indicator"></div>
+                    </div>
+                </div>
+                <div class="knob-value" id="gripper_value">50</div>
+                <div class="gripper-buttons">
+                    <button class="btn" onclick="setMotor('gripper', 0)">OPEN</button>
+                    <button class="btn" onclick="setMotor('gripper', 100)">CLOSE</button>
+                </div>
             </div>
         </div>
 
-        <!-- Wrist Flex -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Wrist Flex</div>
-                <div class="motor-value" id="wrist_flex_value">0</div>
-            </div>
-            <div class="slider-container">
-                <input type="range" id="wrist_flex" min="-100" max="100" value="0" step="1">
-            </div>
-            <div class="range-labels">
-                <span>-100</span>
-                <span>0</span>
-                <span>100</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('wrist_flex', -100)">Min</button>
-                <button class="btn-center" onclick="setMotor('wrist_flex', 0)">Center</button>
-                <button class="btn-max" onclick="setMotor('wrist_flex', 100)">Max</button>
-            </div>
+        <div class="footer">
+            <button class="emergency-btn" onclick="emergencyStop()">[ RETURN TO CENTER ]</button>
         </div>
-
-        <!-- Wrist Roll -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Wrist Roll</div>
-                <div class="motor-value" id="wrist_roll_value">0</div>
-            </div>
-            <div class="slider-container">
-                <input type="range" id="wrist_roll" min="-100" max="100" value="0" step="1">
-            </div>
-            <div class="range-labels">
-                <span>-100</span>
-                <span>0</span>
-                <span>100</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('wrist_roll', -100)">Min</button>
-                <button class="btn-center" onclick="setMotor('wrist_roll', 0)">Center</button>
-                <button class="btn-max" onclick="setMotor('wrist_roll', 100)">Max</button>
-            </div>
-        </div>
-
-        <!-- Gripper -->
-        <div class="motor-control">
-            <div class="motor-header">
-                <div class="motor-name">Gripper</div>
-                <div class="motor-value" id="gripper_value">50</div>
-            </div>
-            <div class="slider-container">
-                <input type="range" id="gripper" min="0" max="100" value="50" step="1">
-            </div>
-            <div class="range-labels">
-                <span>0 (Open)</span>
-                <span>50</span>
-                <span>100 (Closed)</span>
-            </div>
-            <div class="preset-buttons">
-                <button class="btn-min" onclick="setMotor('gripper', 0)">Open</button>
-                <button class="btn-center" onclick="setMotor('gripper', 50)">Half</button>
-                <button class="btn-max" onclick="setMotor('gripper', 100)">Close</button>
-            </div>
-        </div>
-
-        <button class="emergency-stop" onclick="emergencyStop()">
-            🛑 RETURN TO CENTER POSITION
-        </button>
     </div>
 
     <script>
-        // Update motor value displays when sliders move
-        const motors = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
-        
-        // Debounce timers for each motor
-        const debounceTimers = {};
+        // Motor positions
+        const positions = {
+            shoulder_pan: 0,
+            shoulder_lift: 0,
+            elbow_flex: 0,
+            wrist_flex: 0,
+            wrist_roll: 0,
+            gripper: 50
+        };
 
-        motors.forEach(motor => {
-            const slider = document.getElementById(motor);
-            const valueDisplay = document.getElementById(motor + '_value');
+        // XY Pad Controller
+        class XYPad {
+            constructor(padId, cursorId, motorX, motorY) {
+                this.pad = document.getElementById(padId);
+                this.cursor = document.getElementById(cursorId);
+                this.motorX = motorX;
+                this.motorY = motorY;
+                this.isDragging = false;
+                
+                this.pad.addEventListener('mousedown', this.startDrag.bind(this));
+                this.pad.addEventListener('touchstart', this.startDrag.bind(this));
+                document.addEventListener('mousemove', this.drag.bind(this));
+                document.addEventListener('touchmove', this.drag.bind(this));
+                document.addEventListener('mouseup', this.endDrag.bind(this));
+                document.addEventListener('touchend', this.endDrag.bind(this));
+                
+                this.updateCursor();
+            }
+            
+            startDrag(e) {
+                this.isDragging = true;
+                this.updatePosition(e);
+            }
+            
+            drag(e) {
+                if (this.isDragging) {
+                    this.updatePosition(e);
+                }
+            }
+            
+            endDrag() {
+                this.isDragging = false;
+            }
+            
+            updatePosition(e) {
+                const rect = this.pad.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                
+                const normX = Math.max(0, Math.min(1, x / rect.width));
+                const normY = Math.max(0, Math.min(1, y / rect.height));
+                
+                const valueX = Math.round((normX * 200) - 100);
+                const valueY = Math.round(((1 - normY) * 200) - 100);
+                
+                positions[this.motorX] = valueX;
+                positions[this.motorY] = valueY;
+                
+                this.updateCursor();
+                updateMotor(this.motorX, valueX);
+                updateMotor(this.motorY, valueY);
+            }
+            
+            updateCursor() {
+                const x = ((positions[this.motorX] + 100) / 200) * 100;
+                const y = ((100 - positions[this.motorY]) / 200) * 100;
+                this.cursor.style.left = x + '%';
+                this.cursor.style.top = y + '%';
+                document.getElementById(this.motorX + '_value').textContent = positions[this.motorX];
+                document.getElementById(this.motorY + '_value').textContent = positions[this.motorY];
+            }
+        }
 
-            // Update display while dragging (no command sent)
-            slider.addEventListener('input', function() {
-                valueDisplay.textContent = this.value;
-            });
+        // Rotary Knob Controller
+        class Knob {
+            constructor(knobId, indicatorId, motor) {
+                this.knob = document.getElementById(knobId);
+                this.indicator = document.getElementById(indicatorId);
+                this.motor = motor;
+                this.isDragging = false;
+                
+                this.knob.addEventListener('mousedown', this.startDrag.bind(this));
+                this.knob.addEventListener('touchstart', this.startDrag.bind(this));
+                document.addEventListener('mousemove', this.drag.bind(this));
+                document.addEventListener('touchmove', this.drag.bind(this));
+                document.addEventListener('mouseup', this.endDrag.bind(this));
+                document.addEventListener('touchend', this.endDrag.bind(this));
+                
+                this.updateIndicator();
+            }
+            
+            startDrag(e) {
+                this.isDragging = true;
+                this.updateAngle(e);
+            }
+            
+            drag(e) {
+                if (this.isDragging) {
+                    this.updateAngle(e);
+                }
+            }
+            
+            endDrag() {
+                this.isDragging = false;
+            }
+            
+            updateAngle(e) {
+                const rect = this.knob.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - centerX;
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - centerY;
+                
+                let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
+                if (angle < 0) angle += 360;
+                
+                const value = Math.round((angle / 360) * 100);
+                positions[this.motor] = value;
+                
+                this.updateIndicator();
+                updateMotor(this.motor, value);
+            }
+            
+            updateIndicator() {
+                const angle = (positions[this.motor] / 100) * 360;
+                this.indicator.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+                document.getElementById(this.motor + '_value').textContent = positions[this.motor];
+            }
+        }
 
-            // Only send command when slider is RELEASED or clicked
-            slider.addEventListener('change', function() {
-                updateMotor(motor, parseFloat(this.value));
-            });
-        });
+        // Slider Controller
+        class Slider {
+            constructor(motor) {
+                this.motor = motor;
+                this.track = document.querySelector(`[data-motor="${motor}"]`);
+                this.fill = document.getElementById(`${motor}_fill`);
+                this.thumb = document.getElementById(`${motor}_thumb`);
+                this.isDragging = false;
+                
+                this.track.addEventListener('mousedown', this.startDrag.bind(this));
+                this.track.addEventListener('touchstart', this.startDrag.bind(this));
+                document.addEventListener('mousemove', this.drag.bind(this));
+                document.addEventListener('touchmove', this.drag.bind(this));
+                document.addEventListener('mouseup', this.endDrag.bind(this));
+                document.addEventListener('touchend', this.endDrag.bind(this));
+                
+                this.updateSlider();
+            }
+            
+            startDrag(e) {
+                this.isDragging = true;
+                this.updatePosition(e);
+            }
+            
+            drag(e) {
+                if (this.isDragging) {
+                    this.updatePosition(e);
+                }
+            }
+            
+            endDrag() {
+                this.isDragging = false;
+            }
+            
+            updatePosition(e) {
+                const rect = this.track.getBoundingClientRect();
+                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                const norm = Math.max(0, Math.min(1, x / rect.width));
+                const value = Math.round((norm * 200) - 100);
+                
+                positions[this.motor] = value;
+                this.updateSlider();
+                updateMotor(this.motor, value);
+            }
+            
+            updateSlider() {
+                const percent = ((positions[this.motor] + 100) / 200) * 100;
+                this.fill.style.width = percent + '%';
+                this.thumb.style.left = percent + '%';
+                document.getElementById(this.motor + '_value').textContent = positions[this.motor];
+            }
+        }
+
+        // Initialize controllers
+        const shoulderPad = new XYPad('shoulder-pad', 'shoulder-cursor', 'shoulder_pan', 'shoulder_lift');
+        const wristPad = new XYPad('wrist-pad', 'wrist-cursor', 'wrist_roll', 'wrist_flex');
+        const gripperKnob = new Knob('gripper-knob', 'gripper-indicator', 'gripper');
+        const elbowSlider = new Slider('elbow_flex');
 
         function setMotor(motor, value) {
-            const slider = document.getElementById(motor);
-            const valueDisplay = document.getElementById(motor + '_value');
-            slider.value = value;
-            valueDisplay.textContent = value;
+            positions[motor] = value;
+            
+            if (motor === 'gripper') {
+                gripperKnob.updateIndicator();
+            }
+            
             updateMotor(motor, value);
         }
 
         function updateMotor(motor, position) {
             fetch('/api/motor', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    motor: motor,
-                    position: position
-                })
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({motor: motor, position: position})
             })
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {
                     console.error('Error:', data.error);
-                    alert('Error controlling motor: ' + data.error);
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+            .catch(error => console.error('Error:', error));
         }
 
         function emergencyStop() {
-            fetch('/api/center', {
-                method: 'POST'
-            })
+            fetch('/api/center', {method: 'POST'})
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Reset all sliders to center
-                    motors.forEach(motor => {
-                        const slider = document.getElementById(motor);
-                        const valueDisplay = document.getElementById(motor + '_value');
-                        if (motor === 'gripper') {
-                            slider.value = 50;
-                            valueDisplay.textContent = '50';
-                        } else {
-                            slider.value = 0;
-                            valueDisplay.textContent = '0';
-                        }
-                    });
+                    positions.shoulder_pan = 0;
+                    positions.shoulder_lift = 0;
+                    positions.elbow_flex = 0;
+                    positions.wrist_flex = 0;
+                    positions.wrist_roll = 0;
+                    positions.gripper = 50;
+                    
+                    shoulderPad.updateCursor();
+                    wristPad.updateCursor();
+                    elbowSlider.updateSlider();
+                    gripperKnob.updateIndicator();
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+            .catch(error => console.error('Error:', error));
         }
 
-        // Poll current positions every 2 seconds (reduced to avoid bus contention)
+        // Poll positions
         setInterval(() => {
             fetch('/api/positions')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         Object.keys(data.positions).forEach(motor => {
-                            const valueDisplay = document.getElementById(motor + '_value');
-                            if (valueDisplay) {
-                                valueDisplay.textContent = Math.round(data.positions[motor]);
-                            }
+                            positions[motor] = Math.round(data.positions[motor]);
                         });
+                        shoulderPad.updateCursor();
+                        wristPad.updateCursor();
+                        elbowSlider.updateSlider();
+                        gripperKnob.updateIndicator();
                     }
                 })
-                .catch(error => {
-                    console.error('Error fetching positions:', error);
-                });
+                .catch(error => console.error('Error:', error));
         }, 2000);
     </script>
 </body>
