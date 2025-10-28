@@ -1,0 +1,10 @@
+# LeRobot Requirements
+# This file provides a simple way to install LeRobot and its dependencies
+
+# Install LeRobot with all optional dependencies
+# This includes support for motors, robots, cameras, policies, simulation, and development tools
+-e .[all]
+
+# Additional dependencies for SO-101 webserver
+flask>=3.0.0,<4.0.0
+
