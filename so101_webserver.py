@@ -23,11 +23,11 @@ from flask import Flask, render_template_string, jsonify, request
 import threading
 import time
 import logging
+import argparse
 
 from lerobot.robots.so101_follower import SO101Follower, SO101FollowerConfig
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Logger (level will be set based on command-line args)
 logger = logging.getLogger(__name__)
 
 # Flask app
@@ -222,72 +222,78 @@ HTML_TEMPLATE = """
             background: rgba(0, 255, 0, 0.05);
         }
 
-        /* Rotary Knob */
-        .knob-container {
+        /* Vertical Gripper Slider */
+        .gripper-slider-container {
             display: flex;
             flex-direction: column;
+            align-items: center;
             gap: 8px;
+            flex: 1;
         }
 
-        .knob {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto;
+        .gripper-slider-track {
+            width: 30px;
+            height: 180px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 2px solid #0f0;
             position: relative;
             cursor: pointer;
         }
 
-        .knob-circle {
-            width: 100%;
-            height: 100%;
-            border: 3px solid #0f0;
-            border-radius: 50%;
-            background: rgba(0, 255, 0, 0.05);
-            position: relative;
-        }
-
-        .knob-indicator {
+        .gripper-slider-fill {
             position: absolute;
-            width: 4px;
-            height: 45%;
-            background: #0f0;
-            top: 5%;
-            left: 50%;
-            transform-origin: bottom center;
-            transform: translateX(-50%);
-            box-shadow: 0 0 5px #0f0;
+            bottom: 0;
+            width: 100%;
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+            transition: height 0.1s;
         }
 
-        .knob-value {
+        .gripper-slider-thumb {
+            position: absolute;
+            width: 100%;
+            height: 6px;
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+            transition: bottom 0.1s;
+            pointer-events: none;
+        }
+
+        .gripper-value {
             text-align: center;
-            font-size: 16px;
+            font-size: 14px;
             padding: 4px;
             border: 1px solid #0f0;
             background: rgba(0, 255, 0, 0.05);
+            min-width: 60px;
         }
 
-        /* Sliders */
+        /* Vertical Sliders */
         .slider-group {
             display: flex;
             flex-direction: column;
+            align-items: center;
             gap: 8px;
+            flex: 1;
         }
 
         .slider-item {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            align-items: center;
+            gap: 5px;
+            flex: 1;
         }
 
         .slider-label {
             font-size: 10px;
             letter-spacing: 1px;
-            display: flex;
-            justify-content: space-between;
+            text-align: center;
         }
 
         .slider-track {
-            height: 20px;
+            width: 30px;
+            height: 180px;
             background: rgba(0, 255, 0, 0.1);
             border: 2px solid #0f0;
             position: relative;
@@ -295,27 +301,39 @@ HTML_TEMPLATE = """
         }
 
         .slider-fill {
-            height: 100%;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
             background: rgba(0, 255, 0, 0.3);
             box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            transition: width 0.1s;
+            transition: height 0.1s;
         }
 
         .slider-thumb {
             position: absolute;
-            width: 4px;
-            height: 100%;
+            width: 100%;
+            height: 6px;
             background: #0f0;
             box-shadow: 0 0 10px #0f0;
-            transition: left 0.1s;
+            transition: bottom 0.1s;
             pointer-events: none;
+        }
+        
+        .slider-value {
+            text-align: center;
+            font-size: 14px;
+            padding: 4px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+            min-width: 60px;
         }
 
         /* Gripper Control */
         .gripper-buttons {
             display: flex;
+            flex-direction: column;
             gap: 5px;
-            margin-top: auto;
+            width: 100%;
         }
 
         .btn {
@@ -395,17 +413,14 @@ HTML_TEMPLATE = """
 
             <!-- Sliders Section -->
             <div class="control-section">
-                <div class="section-title">LINEAR</div>
+                <div class="section-title">ELBOW</div>
                 <div class="slider-group">
                     <div class="slider-item">
-                        <div class="slider-label">
-                            <span>ELBOW</span>
-                            <span id="elbow_flex_value">0</span>
-                        </div>
                         <div class="slider-track" data-motor="elbow_flex">
                             <div class="slider-fill" id="elbow_flex_fill"></div>
                             <div class="slider-thumb" id="elbow_flex_thumb"></div>
                         </div>
+                        <div class="slider-value" id="elbow_flex_value">0</div>
                     </div>
                 </div>
             </div>
@@ -413,15 +428,16 @@ HTML_TEMPLATE = """
             <!-- Gripper -->
             <div class="control-section">
                 <div class="section-title">GRIPPER</div>
-                <div class="knob" id="gripper-knob">
-                    <div class="knob-circle">
-                        <div class="knob-indicator" id="gripper-indicator"></div>
+                <div class="gripper-slider-container">
+                    <div class="gripper-slider-track" id="gripper-track">
+                        <div class="gripper-slider-fill" id="gripper-fill"></div>
+                        <div class="gripper-slider-thumb" id="gripper-thumb"></div>
                     </div>
+                    <div class="gripper-value" id="gripper_value">50</div>
                 </div>
-                <div class="knob-value" id="gripper_value">50</div>
                 <div class="gripper-buttons">
-                    <button class="btn" onclick="setMotor('gripper', 0)">OPEN</button>
-                    <button class="btn" onclick="setMotor('gripper', 100)">CLOSE</button>
+                    <button class="btn" onclick="setMotor('gripper', 100)">OPEN</button>
+                    <button class="btn" onclick="setMotor('gripper', 0)">CLOSE</button>
                 </div>
             </div>
         </div>
@@ -511,8 +527,19 @@ HTML_TEMPLATE = """
                 const normX = Math.max(0, Math.min(1, x / rect.width));
                 const normY = Math.max(0, Math.min(1, y / rect.height));
                 
-                const valueX = Math.round((normX * 200) - 100);
-                const valueY = Math.round(((1 - normY) * 200) - 100);
+                let valueX = Math.round((normX * 200) - 100);
+                let valueY = Math.round(((1 - normY) * 200) - 100);
+                
+                // Apply inversions based on motor
+                if (this.motorY === 'shoulder_lift') {
+                    valueY = -valueY;  // Invert shoulder up/down
+                }
+                if (this.motorX === 'wrist_roll') {
+                    valueX = -valueX;  // Invert wrist roll
+                }
+                if (this.motorY === 'wrist_flex') {
+                    valueY = -valueY;  // Invert wrist flex
+                }
                 
                 positions[this.motorX] = valueX;
                 positions[this.motorY] = valueY;
@@ -523,8 +550,23 @@ HTML_TEMPLATE = """
             }
             
             updateCursor() {
-                const x = ((positions[this.motorX] + 100) / 200) * 100;
-                const y = ((100 - positions[this.motorY]) / 200) * 100;
+                // Get actual position values (which may be inverted)
+                let dispX = positions[this.motorX];
+                let dispY = positions[this.motorY];
+                
+                // Reverse the inversion for display positioning
+                if (this.motorY === 'shoulder_lift') {
+                    dispY = -dispY;
+                }
+                if (this.motorX === 'wrist_roll') {
+                    dispX = -dispX;
+                }
+                if (this.motorY === 'wrist_flex') {
+                    dispY = -dispY;
+                }
+                
+                const x = ((dispX + 100) / 200) * 100;
+                const y = ((100 - dispY) / 200) * 100;
                 this.cursor.style.left = x + '%';
                 this.cursor.style.top = y + '%';
                 document.getElementById(this.motorX + '_value').textContent = positions[this.motorX];
@@ -532,32 +574,33 @@ HTML_TEMPLATE = """
             }
         }
 
-        // Rotary Knob Controller
-        class Knob {
-            constructor(knobId, indicatorId, motor) {
-                this.knob = document.getElementById(knobId);
-                this.indicator = document.getElementById(indicatorId);
-                this.motor = motor;
+        // Vertical Gripper Slider Controller
+        class GripperSlider {
+            constructor(trackId, fillId, thumbId) {
+                this.track = document.getElementById(trackId);
+                this.fill = document.getElementById(fillId);
+                this.thumb = document.getElementById(thumbId);
+                this.motor = 'gripper';
                 this.isDragging = false;
                 
-                this.knob.addEventListener('mousedown', this.startDrag.bind(this));
-                this.knob.addEventListener('touchstart', this.startDrag.bind(this));
+                this.track.addEventListener('mousedown', this.startDrag.bind(this));
+                this.track.addEventListener('touchstart', this.startDrag.bind(this));
                 document.addEventListener('mousemove', this.drag.bind(this));
                 document.addEventListener('touchmove', this.drag.bind(this));
                 document.addEventListener('mouseup', this.endDrag.bind(this));
                 document.addEventListener('touchend', this.endDrag.bind(this));
                 
-                this.updateIndicator();
+                this.updateSlider();
             }
             
             startDrag(e) {
                 this.isDragging = true;
-                this.updateAngle(e);
+                this.updatePosition(e);
             }
             
             drag(e) {
                 if (this.isDragging) {
-                    this.updateAngle(e);
+                    this.updatePosition(e);
                 }
             }
             
@@ -565,31 +608,27 @@ HTML_TEMPLATE = """
                 this.isDragging = false;
             }
             
-            updateAngle(e) {
-                const rect = this.knob.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - centerX;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - centerY;
+            updatePosition(e) {
+                const rect = this.track.getBoundingClientRect();
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                const norm = Math.max(0, Math.min(1, y / rect.height));
+                // Top = 100 (open), bottom = 0 (close) - FLIPPED
+                const value = Math.round((1 - norm) * 100);
                 
-                let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
-                if (angle < 0) angle += 360;
-                
-                const value = Math.round((angle / 360) * 100);
                 positions[this.motor] = value;
-                
-                this.updateIndicator();
+                this.updateSlider();
                 scheduleMotorUpdate(this.motor, value);
             }
             
-            updateIndicator() {
-                const angle = (positions[this.motor] / 100) * 360;
-                this.indicator.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+            updateSlider() {
+                const percent = positions[this.motor];
+                this.fill.style.height = percent + '%';
+                this.thumb.style.bottom = percent + '%';
                 document.getElementById(this.motor + '_value').textContent = positions[this.motor];
             }
         }
 
-        // Slider Controller
+        // Vertical Slider Controller (for -100 to 100 range)
         class Slider {
             constructor(motor) {
                 this.motor = motor;
@@ -625,8 +664,9 @@ HTML_TEMPLATE = """
             
             updatePosition(e) {
                 const rect = this.track.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const norm = Math.max(0, Math.min(1, x / rect.width));
+                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+                const norm = Math.max(0, Math.min(1, y / rect.height));
+                // Top = -100, Bottom = 100 (FLIPPED)
                 const value = Math.round((norm * 200) - 100);
                 
                 positions[this.motor] = value;
@@ -635,9 +675,13 @@ HTML_TEMPLATE = """
             }
             
             updateSlider() {
+                // Convert -100 to 100 range to 0-100 percent for display
                 const percent = ((positions[this.motor] + 100) / 200) * 100;
-                this.fill.style.width = percent + '%';
-                this.thumb.style.left = percent + '%';
+                // Thumb position: inverted so it follows finger (top = 100% from bottom, bottom = 0% from bottom)
+                const thumbPosition = 100 - percent;
+                this.thumb.style.bottom = thumbPosition + '%';
+                // Fill grows from bottom up to the thumb
+                this.fill.style.height = thumbPosition + '%';
                 document.getElementById(this.motor + '_value').textContent = positions[this.motor];
             }
         }
@@ -645,14 +689,14 @@ HTML_TEMPLATE = """
         // Initialize controllers
         const shoulderPad = new XYPad('shoulder-pad', 'shoulder-cursor', 'shoulder_pan', 'shoulder_lift');
         const wristPad = new XYPad('wrist-pad', 'wrist-cursor', 'wrist_roll', 'wrist_flex');
-        const gripperKnob = new Knob('gripper-knob', 'gripper-indicator', 'gripper');
+        const gripperSlider = new GripperSlider('gripper-track', 'gripper-fill', 'gripper-thumb');
         const elbowSlider = new Slider('elbow_flex');
 
         function setMotor(motor, value) {
             positions[motor] = value;
             
             if (motor === 'gripper') {
-                gripperKnob.updateIndicator();
+                gripperSlider.updateSlider();
             }
             
             scheduleMotorUpdate(motor, value);
@@ -694,7 +738,7 @@ HTML_TEMPLATE = """
                     shoulderPad.updateCursor();
                     wristPad.updateCursor();
                     elbowSlider.updateSlider();
-                    gripperKnob.updateIndicator();
+                    gripperSlider.updateSlider();
                 }
             })
             .catch(error => console.error('Error:', error));
@@ -712,7 +756,7 @@ HTML_TEMPLATE = """
                         shoulderPad.updateCursor();
                         wristPad.updateCursor();
                         elbowSlider.updateSlider();
-                        gripperKnob.updateIndicator();
+                        gripperSlider.updateSlider();
                     }
                 })
                 .catch(error => console.error('Error:', error));
@@ -755,22 +799,22 @@ def control_motor():
             # Send command to robot - use send_action() like teleop does
             if robot and robot.is_connected:
                 action = {f"{motor_name}.pos": position}
-                logger.info(f"Sending action: {action}")
+                logger.debug(f"Sending action: {action}")
                 robot.send_action(action)
                 
-                # Check motor status after sending command (wait a bit for motor to process)
-                import time
-                time.sleep(0.05)  # 50ms delay to let motor start moving
-                try:
-                    status = robot.bus.read("Status", motor_name, normalize=False)
-                    moving = robot.bus.read("Moving", motor_name, normalize=False)
-                    goal_pos_actual = robot.bus.read("Goal_Position", motor_name, normalize=False)
-                    goal_vel_actual = robot.bus.read("Goal_Velocity", motor_name, normalize=False)
-                    present_pos = robot.bus.read("Present_Position", motor_name, normalize=False)
-                    lock = robot.bus.read("Lock", motor_name, normalize=False)
-                    logger.info(f"Motor {motor_name} | Target={position} | GoalPos={goal_pos_actual} | PresentPos={present_pos} | GoalVel={goal_vel_actual} | Lock={lock} | Status={status:#04x} | Moving={moving}")
-                except Exception as e:
-                    logger.warning(f"Could not read motor status: {e}")
+                # Check motor status after sending command (only in verbose mode)
+                if logger.isEnabledFor(logging.DEBUG):
+                    time.sleep(0.05)  # 50ms delay to let motor start moving
+                    try:
+                        status = robot.bus.read("Status", motor_name, normalize=False)
+                        moving = robot.bus.read("Moving", motor_name, normalize=False)
+                        goal_pos_actual = robot.bus.read("Goal_Position", motor_name, normalize=False)
+                        goal_vel_actual = robot.bus.read("Goal_Velocity", motor_name, normalize=False)
+                        present_pos = robot.bus.read("Present_Position", motor_name, normalize=False)
+                        lock = robot.bus.read("Lock", motor_name, normalize=False)
+                        logger.debug(f"Motor {motor_name} | Target={position} | GoalPos={goal_pos_actual} | PresentPos={present_pos} | GoalVel={goal_vel_actual} | Lock={lock} | Status={status:#04x} | Moving={moving}")
+                    except Exception as e:
+                        logger.warning(f"Could not read motor status: {e}")
             else:
                 logger.warning("Robot not connected, storing position only")
 
@@ -804,7 +848,7 @@ def center_all():
                     "gripper.pos": 50.0
                 }
                 robot.send_action(action)
-                logger.info("All motors centered")
+                logger.debug("All motors centered")
             else:
                 logger.warning("Robot not connected, storing positions only")
 
@@ -895,25 +939,46 @@ def cleanup():
 
 
 if __name__ == '__main__':
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='SO-101 Web Control Server')
+    parser.add_argument('--verbose', '-v', action='store_true',
+                        help='Enable verbose debug logging')
+    parser.add_argument('--port', '-p', type=int, default=5001,
+                        help='Port to run the web server on (default: 5001)')
+    args = parser.parse_args()
+
+    # Configure logging based on verbose flag
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s' if args.verbose else '%(message)s'
+    )
+    
+    # Suppress Flask's default logging unless verbose
+    if not args.verbose:
+        logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    
     try:
         # Initialize robot in main thread
         initialize_robot()
 
         # Start web server
-        logger.info("\n" + "="*60)
-        logger.info("🌐 SO-101 Web Server Starting!")
-        logger.info("="*60)
-        logger.info("Access the control panel at:")
-        logger.info("  Local:   http://localhost:5001")
-        logger.info("  Network: http://<your-ip>:5001")
-        logger.info("="*60 + "\n")
+        print("\n" + "="*60)
+        print("🌐 CEDARBOT SO-101 Web Server Starting!")
+        print("="*60)
+        print("Access the control panel at:")
+        print(f"  Local:   http://localhost:{args.port}")
+        print(f"  Network: http://<your-ip>:{args.port}")
+        if args.verbose:
+            print("  Debug:   VERBOSE MODE ENABLED")
+        print("="*60 + "\n")
 
         # Run Flask app
         # host='0.0.0.0' allows access from other devices on the network
-        app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
+        app.run(host='0.0.0.0', port=args.port, debug=False, threaded=True)
 
     except KeyboardInterrupt:
-        logger.info("\n\n🛑 Shutting down...")
+        print("\n\n🛑 Shutting down...")
 
     finally:
         cleanup()
