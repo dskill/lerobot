@@ -631,6 +631,8 @@ def initialize_robot():
 
     except Exception as e:
         logger.error(f"Error initializing robot: {e}")
+        import traceback
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         robot = None
 
 
@@ -653,13 +655,13 @@ if __name__ == '__main__':
         logger.info("🌐 SO-101 Web Server Starting!")
         logger.info("="*60)
         logger.info("Access the control panel at:")
-        logger.info("  Local:   http://localhost:5000")
-        logger.info("  Network: http://<your-ip>:5000")
+        logger.info("  Local:   http://localhost:5001")
+        logger.info("  Network: http://<your-ip>:5001")
         logger.info("="*60 + "\n")
 
         # Run Flask app
         # host='0.0.0.0' allows access from other devices on the network
-        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)
 
     except KeyboardInterrupt:
         logger.info("\n\n🛑 Shutting down...")
