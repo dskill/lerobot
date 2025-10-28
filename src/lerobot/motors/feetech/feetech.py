@@ -67,18 +67,29 @@ class TorqueMode(Enum):
 
 
 def _split_into_byte_chunks(value: int, length: int) -> list[int]:
-    import scservo_sdk as scs
+    # Helper functions for byte manipulation (replicate scservo_sdk internal methods)
+    def lobyte(w: int) -> int:
+        return w & 0xFF
+
+    def hibyte(w: int) -> int:
+        return (w >> 8) & 0xFF
+
+    def loword(l: int) -> int:
+        return l & 0xFFFF
+
+    def hiword(h: int) -> int:
+        return (h >> 16) & 0xFFFF
 
     if length == 1:
         data = [value]
     elif length == 2:
-        data = [scs.SCS_LOBYTE(value), scs.SCS_HIBYTE(value)]
+        data = [lobyte(value), hibyte(value)]
     elif length == 4:
         data = [
-            scs.SCS_LOBYTE(scs.SCS_LOWORD(value)),
-            scs.SCS_HIBYTE(scs.SCS_LOWORD(value)),
-            scs.SCS_LOBYTE(scs.SCS_HIWORD(value)),
-            scs.SCS_HIBYTE(scs.SCS_HIWORD(value)),
+            lobyte(loword(value)),
+            hibyte(loword(value)),
+            lobyte(hiword(value)),
+            hibyte(hiword(value)),
         ]
     return data
 
@@ -131,8 +142,8 @@ class FeetechMotorsBus(MotorsBus):
             self.port_handler, scs.PortHandler
         )
         self.packet_handler = scs.PacketHandler(protocol_version)
-        self.sync_reader = scs.GroupSyncRead(self.port_handler, self.packet_handler, 0, 0)
-        self.sync_writer = scs.GroupSyncWrite(self.port_handler, self.packet_handler, 0, 0)
+        self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
+        self.sync_writer = scs.GroupSyncWrite(self.port_handler, 0, 0)
         self._comm_success = scs.COMM_SUCCESS
         self._no_error = 0x00
 

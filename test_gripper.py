@@ -52,6 +52,9 @@ try:
         target_open = initial_pos + 500
         print(f"  Opening to {target_open}... ", end="", flush=True)
         bus.write("Goal_Position", "gripper", target_open, normalize=False)
+        # IMPORTANT: Feetech motors need Goal_Velocity AND Acceleration for movement!
+        bus.write("Goal_Velocity", "gripper", 600, normalize=False)
+        bus.write("Acceleration", "gripper", 20, normalize=False)
         time.sleep(1.5)
         pos = bus.read("Present_Position", "gripper", normalize=False)
         moved = abs(pos - initial_pos)
@@ -61,6 +64,8 @@ try:
         target_close = initial_pos - 500
         print(f"  Closing to {target_close}... ", end="", flush=True)
         bus.write("Goal_Position", "gripper", target_close, normalize=False)
+        bus.write("Goal_Velocity", "gripper", 600, normalize=False)
+        bus.write("Acceleration", "gripper", 20, normalize=False)
         time.sleep(1.5)
         pos = bus.read("Present_Position", "gripper", normalize=False)
         moved = abs(pos - initial_pos)
@@ -69,6 +74,8 @@ try:
     # Return to initial position
     print(f"\nReturning to initial position ({initial_pos})...")
     bus.write("Goal_Position", "gripper", initial_pos, normalize=False)
+    bus.write("Goal_Velocity", "gripper", 600, normalize=False)
+    bus.write("Acceleration", "gripper", 20, normalize=False)
     time.sleep(0.5)
 
     print("\n" + "=" * 60)
