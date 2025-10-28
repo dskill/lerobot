@@ -442,6 +442,33 @@ HTML_TEMPLATE = """
             gripper: 50
         };
 
+        // Rate limiting: 30Hz = 33.33ms between updates
+        const UPDATE_INTERVAL = 33; // milliseconds
+        const lastUpdateTime = {};
+        const pendingUpdates = {};
+        let updateTimer = null;
+
+        // Initialize timestamps
+        Object.keys(positions).forEach(motor => {
+            lastUpdateTime[motor] = 0;
+            pendingUpdates[motor] = null;
+        });
+
+        // Process pending updates at 30Hz
+        function processPendingUpdates() {
+            const now = Date.now();
+            Object.keys(pendingUpdates).forEach(motor => {
+                if (pendingUpdates[motor] !== null && (now - lastUpdateTime[motor]) >= UPDATE_INTERVAL) {
+                    sendMotorCommand(motor, pendingUpdates[motor]);
+                    lastUpdateTime[motor] = now;
+                    pendingUpdates[motor] = null;
+                }
+            });
+        }
+
+        // Start the update timer
+        setInterval(processPendingUpdates, UPDATE_INTERVAL);
+
         // XY Pad Controller
         class XYPad {
             constructor(padId, cursorId, motorX, motorY) {
@@ -491,8 +518,8 @@ HTML_TEMPLATE = """
                 positions[this.motorY] = valueY;
                 
                 this.updateCursor();
-                updateMotor(this.motorX, valueX);
-                updateMotor(this.motorY, valueY);
+                scheduleMotorUpdate(this.motorX, valueX);
+                scheduleMotorUpdate(this.motorY, valueY);
             }
             
             updateCursor() {
@@ -552,7 +579,7 @@ HTML_TEMPLATE = """
                 positions[this.motor] = value;
                 
                 this.updateIndicator();
-                updateMotor(this.motor, value);
+                scheduleMotorUpdate(this.motor, value);
             }
             
             updateIndicator() {
@@ -604,7 +631,7 @@ HTML_TEMPLATE = """
                 
                 positions[this.motor] = value;
                 this.updateSlider();
-                updateMotor(this.motor, value);
+                scheduleMotorUpdate(this.motor, value);
             }
             
             updateSlider() {
@@ -628,10 +655,16 @@ HTML_TEMPLATE = """
                 gripperKnob.updateIndicator();
             }
             
-            updateMotor(motor, value);
+            scheduleMotorUpdate(motor, value);
         }
 
-        function updateMotor(motor, position) {
+        // Schedule a motor update (will be rate-limited to 30Hz)
+        function scheduleMotorUpdate(motor, position) {
+            pendingUpdates[motor] = position;
+        }
+
+        // Actually send the motor command to the server
+        function sendMotorCommand(motor, position) {
             fetch('/api/motor', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
