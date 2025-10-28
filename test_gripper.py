@@ -3,14 +3,34 @@
 Simple gripper test for SO-101 - Opens and closes the gripper
 """
 import time
+import argparse
 from lerobot.motors import Motor, MotorNormMode
 from lerobot.motors.feetech import FeetechMotorsBus
 
-PORT = "/dev/tty.usbmodem5A7A0562271"  # Follower arm
+# Port configuration
+PORT_LINUX = "/dev/ttyACM0"  # Linux/Raspberry Pi
+PORT_MAC = "/dev/tty.usbmodem5A7A0562271"  # macOS
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='SO-101 Gripper Test')
+parser.add_argument('--mac', action='store_true',
+                    help=f'Use macOS port ({PORT_MAC}) instead of Linux port ({PORT_LINUX})')
+parser.add_argument('--port', type=str, default=None,
+                    help='Serial port for the robot (overrides --mac flag)')
+args = parser.parse_args()
+
+# Determine which port to use
+if args.port:
+    PORT = args.port
+elif args.mac:
+    PORT = PORT_MAC
+else:
+    PORT = PORT_LINUX
 
 print("=" * 60)
 print("SO-101 GRIPPER TEST")
 print("=" * 60)
+print(f"Using port: {PORT}")
 
 # Create the motor bus with just the gripper
 bus = FeetechMotorsBus(

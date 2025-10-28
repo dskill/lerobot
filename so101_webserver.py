@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Robot configuration
-FOLLOWER_PORT = "/dev/tty.usbmodem5A7A0562271"  # Update this to match your port
+FOLLOWER_PORT_LINUX = "/dev/ttyACM0"  # Linux/Raspberry Pi
+FOLLOWER_PORT_MAC = "/dev/tty.usbmodem5A7A0562271"  # macOS
+FOLLOWER_PORT = FOLLOWER_PORT_LINUX  # Default to Linux
 
 # Global robot instance
 robot = None
@@ -885,16 +887,18 @@ def get_positions():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-def initialize_robot():
+def initialize_robot(port=None):
     """Initialize the SO-101 follower robot."""
     global robot
+    
+    robot_port = port if port is not None else FOLLOWER_PORT
 
     try:
         logger.info("Initializing SO-101 Follower arm...")
-        logger.info(f"Port: {FOLLOWER_PORT}")
+        logger.info(f"Port: {robot_port}")
 
         config = SO101FollowerConfig(
-            port=FOLLOWER_PORT,
+            port=robot_port,
             id=None,  # Use None to match calibration file name
             use_degrees=False  # Using normalized -100 to 100 range
         )
@@ -945,7 +949,19 @@ if __name__ == '__main__':
                         help='Enable verbose debug logging')
     parser.add_argument('--port', '-p', type=int, default=5001,
                         help='Port to run the web server on (default: 5001)')
+    parser.add_argument('--mac', action='store_true',
+                        help=f'Use macOS port ({FOLLOWER_PORT_MAC}) instead of Linux port ({FOLLOWER_PORT_LINUX})')
+    parser.add_argument('--robot-port', type=str, default=None,
+                        help='Serial port for the robot (overrides --mac flag)')
     args = parser.parse_args()
+    
+    # Determine which port to use
+    if args.robot_port:
+        robot_port = args.robot_port
+    elif args.mac:
+        robot_port = FOLLOWER_PORT_MAC
+    else:
+        robot_port = FOLLOWER_PORT_LINUX
 
     # Configure logging based on verbose flag
     log_level = logging.DEBUG if args.verbose else logging.INFO
@@ -960,7 +976,7 @@ if __name__ == '__main__':
     
     try:
         # Initialize robot in main thread
-        initialize_robot()
+        initialize_robot(port=robot_port)
 
         # Start web server
         print("\n" + "="*60)
