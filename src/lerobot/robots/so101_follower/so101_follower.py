@@ -168,6 +168,17 @@ class SO101Follower(Robot):
                 # Set I_Coefficient and D_Coefficient to default value 0 and 32
                 self.bus.write("I_Coefficient", motor, 0)
                 self.bus.write("D_Coefficient", motor, 32)
+                # Set dead zones to 0 for precise positioning (default is 1-2 which causes ~50 step dead zone)
+                self.bus.write("CW_Dead_Zone", motor, 0)
+                self.bus.write("CCW_Dead_Zone", motor, 0)
+                
+                # IMPORTANT: Set Goal_Velocity and Acceleration ONCE at startup!
+                # These parameters persist and don't need to be written on every command.
+                # Writing them repeatedly causes bus contention and unreliable movement.
+                # Velocity: 600 provides smooth, fast movement
+                # Acceleration: 25 provides smooth acceleration/deceleration at 30Hz
+                self.bus.write("Goal_Velocity", motor, 600)
+                self.bus.write("Acceleration", motor, 25)
 
                 if motor == "gripper":
                     self.bus.write(
@@ -228,17 +239,9 @@ class SO101Follower(Robot):
             goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
 
         # Send goal position to the arm
+        # Note: Goal_Velocity and Acceleration are set once in configure() and persist
+        logger.debug(f"Writing Goal_Position: {goal_pos}")
         self.bus.sync_write("Goal_Position", goal_pos)
-        
-        # IMPORTANT: Feetech motors need Goal_Velocity AND Acceleration set for smooth movement!
-        # Without Goal_Velocity, motors lock in place with Lock=1 but won't execute movement.
-        # Without Acceleration, motors start/stop abruptly causing jerky motion.
-        # Velocity: 400 provides smooth, natural movement (~10% of 4096 range)
-        # Acceleration: 50 provides smooth acceleration/deceleration
-        goal_vel = {motor: 600 for motor in goal_pos}
-        goal_acc = {motor: 25 for motor in goal_pos}
-        self.bus.sync_write("Goal_Velocity", goal_vel)
-        self.bus.sync_write("Acceleration", goal_acc)
         
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 

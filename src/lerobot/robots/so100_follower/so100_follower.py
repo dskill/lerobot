@@ -160,6 +160,14 @@ class SO100Follower(Robot):
                 # Set I_Coefficient and D_Coefficient to default value 0 and 32
                 self.bus.write("I_Coefficient", motor, 0)
                 self.bus.write("D_Coefficient", motor, 32)
+                
+                # IMPORTANT: Set Goal_Velocity and Acceleration ONCE at startup!
+                # These parameters persist and don't need to be written on every command.
+                # Writing them repeatedly causes bus contention and unreliable movement.
+                # Velocity: 400 provides smooth, natural movement (~10% of 4096 range)
+                # Acceleration: 50 provides smooth acceleration/deceleration
+                self.bus.write("Goal_Velocity", motor, 400)
+                self.bus.write("Acceleration", motor, 50)
 
                 if motor == "gripper":
                     self.bus.write("Max_Torque_Limit", motor, 500)  # 50% of max torque to avoid burnout
@@ -218,17 +226,8 @@ class SO100Follower(Robot):
             goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
 
         # Send goal position to the arm
+        # Note: Goal_Velocity and Acceleration are set once in configure() and persist
         self.bus.sync_write("Goal_Position", goal_pos)
-        
-        # IMPORTANT: Feetech motors need Goal_Velocity AND Acceleration set for smooth movement!
-        # Without Goal_Velocity, motors lock in place with Lock=1 but won't execute movement.
-        # Without Acceleration, motors start/stop abruptly causing jerky motion.
-        # Velocity: 400 provides smooth, natural movement (~10% of 4096 range)
-        # Acceleration: 50 provides smooth acceleration/deceleration
-        goal_vel = {motor: 400 for motor in goal_pos}
-        goal_acc = {motor: 50 for motor in goal_pos}
-        self.bus.sync_write("Goal_Velocity", goal_vel)
-        self.bus.sync_write("Acceleration", goal_acc)
         
         return {f"{motor}.pos": val for motor, val in goal_pos.items()}
 

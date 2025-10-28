@@ -27,7 +27,7 @@ import logging
 from lerobot.robots.so101_follower import SO101Follower, SO101FollowerConfig
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Flask app
@@ -393,15 +393,20 @@ HTML_TEMPLATE = """
     <script>
         // Update motor value displays when sliders move
         const motors = ['shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'];
+        
+        // Debounce timers for each motor
+        const debounceTimers = {};
 
         motors.forEach(motor => {
             const slider = document.getElementById(motor);
             const valueDisplay = document.getElementById(motor + '_value');
 
+            // Update display while dragging (no command sent)
             slider.addEventListener('input', function() {
                 valueDisplay.textContent = this.value;
             });
 
+            // Only send command when slider is RELEASED or clicked
             slider.addEventListener('change', function() {
                 updateMotor(motor, parseFloat(this.value));
             });
@@ -464,7 +469,7 @@ HTML_TEMPLATE = """
             });
         }
 
-        // Poll current positions every 500ms
+        // Poll current positions every 2 seconds (reduced to avoid bus contention)
         setInterval(() => {
             fetch('/api/positions')
                 .then(response => response.json())
@@ -481,7 +486,7 @@ HTML_TEMPLATE = """
                 .catch(error => {
                     console.error('Error fetching positions:', error);
                 });
-        }, 500);
+        }, 2000);
     </script>
 </body>
 </html>
@@ -517,11 +522,25 @@ def control_motor():
         with robot_lock:
             current_positions[motor_name] = position
 
-            # Send command to robot
+            # Send command to robot - use send_action() like teleop does
             if robot and robot.is_connected:
                 action = {f"{motor_name}.pos": position}
+                logger.info(f"Sending action: {action}")
                 robot.send_action(action)
-                logger.info(f"Motor {motor_name} set to {position}")
+                
+                # Check motor status after sending command (wait a bit for motor to process)
+                import time
+                time.sleep(0.05)  # 50ms delay to let motor start moving
+                try:
+                    status = robot.bus.read("Status", motor_name, normalize=False)
+                    moving = robot.bus.read("Moving", motor_name, normalize=False)
+                    goal_pos_actual = robot.bus.read("Goal_Position", motor_name, normalize=False)
+                    goal_vel_actual = robot.bus.read("Goal_Velocity", motor_name, normalize=False)
+                    present_pos = robot.bus.read("Present_Position", motor_name, normalize=False)
+                    lock = robot.bus.read("Lock", motor_name, normalize=False)
+                    logger.info(f"Motor {motor_name} | Target={position} | GoalPos={goal_pos_actual} | PresentPos={present_pos} | GoalVel={goal_vel_actual} | Lock={lock} | Status={status:#04x} | Moving={moving}")
+                except Exception as e:
+                    logger.warning(f"Could not read motor status: {e}")
             else:
                 logger.warning("Robot not connected, storing position only")
 
