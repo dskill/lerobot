@@ -161,8 +161,19 @@ class FeetechMotorsBus(MotorsBus):
                 if hasattr(protocol_handler, method_name):
                     setattr(self.port_handler, method_name, getattr(protocol_handler, method_name))
         
-        self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
-        self.sync_writer = scs.GroupSyncWrite(self.port_handler, 0, 0)
+        # SDK compatibility: Different versions have different signatures
+        # Old: GroupSyncRead(ph, start_address, data_length)
+        # New: GroupSyncRead(port, ph, start_address, data_length)
+        import inspect
+        sig = inspect.signature(scs.GroupSyncRead)
+        if len(sig.parameters) == 4:
+            # New API with port parameter
+            self.sync_reader = scs.GroupSyncRead(self.port, self.port_handler, 0, 0)
+            self.sync_writer = scs.GroupSyncWrite(self.port, self.port_handler, 0, 0)
+        else:
+            # Old API without port parameter
+            self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
+            self.sync_writer = scs.GroupSyncWrite(self.port_handler, 0, 0)
         self._comm_success = scs.COMM_SUCCESS
         self._no_error = 0x00
 
