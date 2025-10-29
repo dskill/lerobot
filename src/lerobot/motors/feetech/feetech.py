@@ -163,13 +163,13 @@ class FeetechMotorsBus(MotorsBus):
         
         # SDK compatibility: Different versions have different signatures
         # Old: GroupSyncRead(ph, start_address, data_length)
-        # New: GroupSyncRead(port, ph, start_address, data_length)
+        # New: GroupSyncRead(port_handler, ph, start_address, data_length) - uses ph twice
         import inspect
         sig = inspect.signature(scs.GroupSyncRead)
         if len(sig.parameters) == 4:
-            # New API with port parameter
-            self.sync_reader = scs.GroupSyncRead(self.port, self.port_handler, 0, 0)
-            self.sync_writer = scs.GroupSyncWrite(self.port, self.port_handler, 0, 0)
+            # New API - pass port_handler for both port and ph arguments
+            self.sync_reader = scs.GroupSyncRead(self.port_handler, self.port_handler, 0, 0)
+            self.sync_writer = scs.GroupSyncWrite(self.port_handler, self.port_handler, 0, 0)
         else:
             # Old API without port parameter
             self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
