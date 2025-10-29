@@ -175,9 +175,9 @@ class SO101Follower(Robot):
                 # IMPORTANT: Set Goal_Velocity and Acceleration ONCE at startup!
                 # These parameters persist and don't need to be written on every command.
                 # Writing them repeatedly causes bus contention and unreliable movement.
-                # Velocity: 600 provides smooth, fast movement
+                # Velocity: 300 provides smooth, moderate movement (reduced from 600 for safety)
                 # Acceleration: 25 provides smooth acceleration/deceleration at 30Hz
-                self.bus.write("Goal_Velocity", motor, 600)
+                self.bus.write("Goal_Velocity", motor, 300)
                 self.bus.write("Acceleration", motor, 25)
 
                 if motor == "gripper":
