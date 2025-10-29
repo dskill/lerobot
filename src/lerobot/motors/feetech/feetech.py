@@ -148,7 +148,13 @@ class FeetechMotorsBus(MotorsBus):
         # that don't exist - they're in protocol_packet_handler instead
         # We need to create a protocol_packet_handler and delegate to it
         if not hasattr(self.port_handler, 'syncWriteTxOnly'):
-            protocol_handler = scs.protocol_packet_handler(self.port_handler, scs.SCS_END)
+            # Try new API (vassar-feetech-servo-sdk) first, fall back to old API
+            try:
+                protocol_handler = scs.protocol_packet_handler()
+            except TypeError:
+                # Old API that takes arguments
+                protocol_handler = scs.protocol_packet_handler(self.port_handler, scs.SCS_END)
+            
             # Add methods needed by GroupSyncWrite
             self.port_handler.syncWriteTxOnly = protocol_handler.syncWriteTxOnly
             # Add methods needed by GroupSyncRead
