@@ -155,13 +155,11 @@ class FeetechMotorsBus(MotorsBus):
                 # Old API that takes arguments
                 protocol_handler = scs.protocol_packet_handler(self.port_handler, scs.SCS_END)
             
-            # Add methods needed by GroupSyncWrite
-            self.port_handler.syncWriteTxOnly = protocol_handler.syncWriteTxOnly
-            # Add methods needed by GroupSyncRead
-            self.port_handler.syncReadTx = protocol_handler.syncReadTx
-            self.port_handler.syncReadRx = protocol_handler.syncReadRx
-            self.port_handler.scs_makeword = protocol_handler.scs_makeword
-            self.port_handler.scs_makedword = protocol_handler.scs_makedword
+            # Add methods that exist in the protocol_handler
+            # Different SDK versions have different methods available
+            for method_name in ['syncWriteTxOnly', 'syncReadTx', 'syncReadRx', 'scs_makeword', 'scs_makedword']:
+                if hasattr(protocol_handler, method_name):
+                    setattr(self.port_handler, method_name, getattr(protocol_handler, method_name))
         
         self.sync_reader = scs.GroupSyncRead(self.port_handler, 0, 0)
         self.sync_writer = scs.GroupSyncWrite(self.port_handler, 0, 0)
