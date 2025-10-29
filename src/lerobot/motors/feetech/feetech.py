@@ -157,7 +157,7 @@ class FeetechMotorsBus(MotorsBus):
             
             # Add methods that exist in the protocol_handler
             # Different SDK versions have different methods available
-            for method_name in ['syncWriteTxOnly', 'syncReadTx', 'syncReadRx', 'scs_makeword', 'scs_makedword']:
+            for method_name in ['syncWriteTxOnly', 'syncReadTx', 'syncReadRx', 'readRx', 'scs_makeword', 'scs_makedword']:
                 if hasattr(protocol_handler, method_name):
                     setattr(self.port_handler, method_name, getattr(protocol_handler, method_name))
         
