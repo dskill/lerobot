@@ -50,6 +50,15 @@ current_positions = {
     "gripper": 50.0  # Start gripper at mid-position
 }
 
+# Position recording and cycling
+recorded_positions = {
+    "position_1": None,
+    "position_2": None
+}
+cycle_active = False
+cycle_thread = None
+cycle_interval = 15.0  # Default 15 seconds
+
 # HTML template for the control interface
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -121,7 +130,7 @@ HTML_TEMPLATE = """
             height: 480px;
             padding: 15px;
             display: grid;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto 1fr auto auto;
             gap: 10px;
         }
 
@@ -379,6 +388,85 @@ HTML_TEMPLATE = """
             background: rgba(0, 255, 0, 0.3);
             box-shadow: inset 0 0 20px #0f0;
         }
+
+        .cycle-section {
+            border: 2px solid #0f0;
+            padding: 8px;
+            background: rgba(0, 255, 0, 0.02);
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        .cycle-column {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .cycle-label {
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-align: center;
+            padding: 3px;
+            border-bottom: 1px solid #0f0;
+        }
+
+        .position-indicator {
+            font-size: 9px;
+            text-align: center;
+            padding: 3px;
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+            min-height: 20px;
+        }
+
+        .position-recorded {
+            background: rgba(0, 255, 0, 0.15);
+        }
+
+        .interval-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #0f0;
+            background: rgba(0, 0, 0, 0.5);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .interval-input:focus {
+            outline: none;
+            background: rgba(0, 255, 0, 0.1);
+        }
+
+        .cycle-btn {
+            padding: 8px;
+            border: 2px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: all 0.1s;
+        }
+
+        .cycle-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .cycle-btn:not(:disabled):active {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: inset 0 0 10px #0f0;
+        }
+
+        .cycle-btn.active {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 15px #0f0;
+        }
     </style>
 </head>
 <body>
@@ -447,6 +535,26 @@ HTML_TEMPLATE = """
         <div class="footer">
             <button class="emergency-btn" onclick="emergencyStop()">[ RETURN TO CENTER ]</button>
         </div>
+
+        <!-- Position Cycling Controls -->
+        <div class="cycle-section">
+            <div class="cycle-column">
+                <div class="cycle-label">POSITION 1</div>
+                <button class="cycle-btn" onclick="recordPosition(1)">RECORD</button>
+                <div class="position-indicator" id="pos1-indicator">NOT SET</div>
+            </div>
+            <div class="cycle-column">
+                <div class="cycle-label">POSITION 2</div>
+                <button class="cycle-btn" onclick="recordPosition(2)">RECORD</button>
+                <div class="position-indicator" id="pos2-indicator">NOT SET</div>
+            </div>
+            <div class="cycle-column">
+                <div class="cycle-label">CYCLE CONTROL</div>
+                <input type="number" class="interval-input" id="interval-input" value="15" min="1" max="300" step="0.5" placeholder="Interval (s)">
+                <button class="cycle-btn" id="cycle-btn" onclick="toggleCycle()" disabled>START CYCLE</button>
+                <button class="cycle-btn" onclick="clearPositions()">CLEAR</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -459,6 +567,13 @@ HTML_TEMPLATE = """
             wrist_roll: 0,
             gripper: 50
         };
+
+        // Position recording state
+        const recordedPositions = {
+            position_1: null,
+            position_2: null
+        };
+        let cycleActive = false;
 
         // Rate limiting: 30Hz = 33.33ms between updates
         const UPDATE_INTERVAL = 33; // milliseconds
@@ -763,6 +878,126 @@ HTML_TEMPLATE = """
                 })
                 .catch(error => console.error('Error:', error));
         }, 2000);
+
+        // Position Recording and Cycling Functions
+        function recordPosition(posNum) {
+            fetch('/api/record_position', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({position_number: posNum})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    recordedPositions[`position_${posNum}`] = data.position;
+                    updateCycleUI();
+                } else {
+                    console.error('Error recording position:', data.error);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function toggleCycle() {
+            if (cycleActive) {
+                // Stop cycling
+                fetch('/api/stop_cycle', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        cycleActive = false;
+                        updateCycleUI();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            } else {
+                // Start cycling
+                const interval = parseFloat(document.getElementById('interval-input').value);
+                fetch('/api/start_cycle', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({interval: interval})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        cycleActive = true;
+                        updateCycleUI();
+                    } else {
+                        console.error('Error starting cycle:', data.error);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        }
+
+        function clearPositions() {
+            fetch('/api/clear_positions', {method: 'POST'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    recordedPositions.position_1 = null;
+                    recordedPositions.position_2 = null;
+                    cycleActive = false;
+                    updateCycleUI();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateCycleUI() {
+            // Update position indicators
+            const pos1Indicator = document.getElementById('pos1-indicator');
+            const pos2Indicator = document.getElementById('pos2-indicator');
+            const cycleBtn = document.getElementById('cycle-btn');
+
+            if (recordedPositions.position_1) {
+                pos1Indicator.textContent = 'RECORDED';
+                pos1Indicator.classList.add('position-recorded');
+            } else {
+                pos1Indicator.textContent = 'NOT SET';
+                pos1Indicator.classList.remove('position-recorded');
+            }
+
+            if (recordedPositions.position_2) {
+                pos2Indicator.textContent = 'RECORDED';
+                pos2Indicator.classList.add('position-recorded');
+            } else {
+                pos2Indicator.textContent = 'NOT SET';
+                pos2Indicator.classList.remove('position-recorded');
+            }
+
+            // Enable/disable cycle button
+            const bothRecorded = recordedPositions.position_1 && recordedPositions.position_2;
+            cycleBtn.disabled = !bothRecorded;
+
+            // Update cycle button text and style
+            if (cycleActive) {
+                cycleBtn.textContent = 'STOP CYCLE';
+                cycleBtn.classList.add('active');
+            } else {
+                cycleBtn.textContent = 'START CYCLE';
+                cycleBtn.classList.remove('active');
+            }
+        }
+
+        // Poll cycle status
+        setInterval(() => {
+            fetch('/api/cycle_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        cycleActive = data.cycle_active;
+                        if (data.position_1) recordedPositions.position_1 = data.position_1;
+                        if (data.position_2) recordedPositions.position_2 = data.position_2;
+                        updateCycleUI();
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }, 1000);
+
+        // Initialize cycle UI
+        updateCycleUI();
     </script>
 </body>
 </html>
@@ -887,6 +1122,175 @@ def get_positions():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/record_position', methods=['POST'])
+def record_position():
+    """Record the current position as position 1 or 2."""
+    global recorded_positions
+    
+    try:
+        data = request.json
+        pos_num = data.get('position_number')
+        
+        if pos_num not in [1, 2]:
+            return jsonify({'success': False, 'error': 'Position number must be 1 or 2'}), 400
+        
+        with robot_lock:
+            # Get current positions
+            if robot and robot.is_connected:
+                obs = robot.get_observation()
+                position = {}
+                for motor in current_positions.keys():
+                    key = f"{motor}.pos"
+                    if key in obs:
+                        position[motor] = obs[key]
+                    else:
+                        position[motor] = current_positions[motor]
+            else:
+                position = current_positions.copy()
+            
+            # Store the position
+            recorded_positions[f'position_{pos_num}'] = position
+            logger.info(f"Recorded position {pos_num}: {position}")
+        
+        return jsonify({'success': True, 'position': position})
+    
+    except Exception as e:
+        logger.error(f"Error recording position: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/start_cycle', methods=['POST'])
+def start_cycle():
+    """Start cycling between the two recorded positions."""
+    global cycle_active, cycle_thread, cycle_interval
+    
+    try:
+        data = request.json
+        interval = float(data.get('interval', 15.0))
+        
+        if interval < 1 or interval > 300:
+            return jsonify({'success': False, 'error': 'Interval must be between 1 and 300 seconds'}), 400
+        
+        # Check if both positions are recorded
+        if not recorded_positions['position_1'] or not recorded_positions['position_2']:
+            return jsonify({'success': False, 'error': 'Both positions must be recorded first'}), 400
+        
+        # Stop existing cycle if running
+        if cycle_active:
+            cycle_active = False
+            if cycle_thread and cycle_thread.is_alive():
+                cycle_thread.join(timeout=2.0)
+        
+        # Start new cycle
+        cycle_interval = interval
+        cycle_active = True
+        cycle_thread = threading.Thread(target=cycle_loop, daemon=True)
+        cycle_thread.start()
+        
+        logger.info(f"Started cycling with interval {interval}s")
+        return jsonify({'success': True, 'interval': interval})
+    
+    except Exception as e:
+        logger.error(f"Error starting cycle: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/stop_cycle', methods=['POST'])
+def stop_cycle():
+    """Stop the position cycling."""
+    global cycle_active
+    
+    try:
+        cycle_active = False
+        logger.info("Stopped cycling")
+        return jsonify({'success': True})
+    
+    except Exception as e:
+        logger.error(f"Error stopping cycle: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/clear_positions', methods=['POST'])
+def clear_positions():
+    """Clear all recorded positions and stop cycling."""
+    global cycle_active, recorded_positions
+    
+    try:
+        cycle_active = False
+        recorded_positions['position_1'] = None
+        recorded_positions['position_2'] = None
+        
+        logger.info("Cleared all recorded positions")
+        return jsonify({'success': True})
+    
+    except Exception as e:
+        logger.error(f"Error clearing positions: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cycle_status', methods=['GET'])
+def cycle_status():
+    """Get the current cycle status."""
+    try:
+        return jsonify({
+            'success': True,
+            'cycle_active': cycle_active,
+            'position_1': recorded_positions['position_1'],
+            'position_2': recorded_positions['position_2'],
+            'interval': cycle_interval
+        })
+    
+    except Exception as e:
+        logger.error(f"Error getting cycle status: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+def cycle_loop():
+    """Background thread that cycles between two positions."""
+    global cycle_active
+    
+    logger.info("Cycle loop started")
+    current_target = 1  # Start with position 1
+    
+    while cycle_active:
+        try:
+            # Get the target position
+            position_key = f'position_{current_target}'
+            target_position = recorded_positions[position_key]
+            
+            if not target_position:
+                logger.warning(f"Position {current_target} not set, stopping cycle")
+                cycle_active = False
+                break
+            
+            # Send robot to target position
+            with robot_lock:
+                if robot and robot.is_connected:
+                    action = {f"{motor}.pos": pos for motor, pos in target_position.items()}
+                    robot.send_action(action)
+                    logger.info(f"Moving to position {current_target}")
+                else:
+                    logger.warning("Robot not connected, stopping cycle")
+                    cycle_active = False
+                    break
+            
+            # Toggle target for next iteration
+            current_target = 2 if current_target == 1 else 1
+            
+            # Wait for the interval
+            sleep_time = 0
+            while sleep_time < cycle_interval and cycle_active:
+                time.sleep(0.5)
+                sleep_time += 0.5
+        
+        except Exception as e:
+            logger.error(f"Error in cycle loop: {e}")
+            cycle_active = False
+            break
+    
+    logger.info("Cycle loop stopped")
+
+
 def initialize_robot(port=None):
     """Initialize the SO-101 follower robot."""
     global robot
@@ -934,8 +1338,17 @@ def initialize_robot(port=None):
 
 
 def cleanup():
-    """Cleanup robot connection."""
-    global robot
+    """Cleanup robot connection and stop cycling."""
+    global robot, cycle_active, cycle_thread
+    
+    # Stop cycling if active
+    if cycle_active:
+        logger.info("Stopping cycle thread...")
+        cycle_active = False
+        if cycle_thread and cycle_thread.is_alive():
+            cycle_thread.join(timeout=2.0)
+    
+    # Disconnect robot
     if robot and robot.is_connected:
         logger.info("Disconnecting robot...")
         robot.disconnect()
