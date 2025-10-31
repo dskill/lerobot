@@ -128,51 +128,51 @@ HTML_TEMPLATE = """
         .container {
             width: 800px;
             height: 480px;
-            padding: 15px;
+            padding: 10px;
             display: grid;
-            grid-template-rows: auto 1fr auto auto;
-            gap: 10px;
+            grid-template-rows: auto 1fr auto;
+            gap: 8px;
         }
 
         .header {
             text-align: center;
             border: 2px solid #0f0;
-            padding: 8px;
+            padding: 5px;
             background: rgba(0, 255, 0, 0.05);
         }
 
         .header h1 {
-            font-size: 20px;
-            letter-spacing: 4px;
-            margin-bottom: 3px;
+            font-size: 16px;
+            letter-spacing: 3px;
+            margin-bottom: 2px;
         }
 
         .status {
-            font-size: 11px;
+            font-size: 10px;
             letter-spacing: 2px;
         }
 
         .main-grid {
             display: grid;
             grid-template-columns: 180px 180px 1fr 120px;
-            gap: 10px;
+            gap: 8px;
         }
 
         .control-section {
             border: 2px solid #0f0;
-            padding: 8px;
+            padding: 6px;
             background: rgba(0, 255, 0, 0.02);
             display: flex;
             flex-direction: column;
         }
 
         .section-title {
-            font-size: 10px;
+            font-size: 9px;
             letter-spacing: 2px;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-align: center;
             border-bottom: 1px solid #0f0;
-            padding-bottom: 4px;
+            padding-bottom: 3px;
         }
 
         /* XY Pad Controller */
@@ -366,73 +366,69 @@ HTML_TEMPLATE = """
         }
 
         .footer {
-            display: flex;
-            gap: 10px;
+            border: 2px solid #0f0;
+            padding: 6px;
+            background: rgba(0, 255, 0, 0.02);
+            display: grid;
+            grid-template-columns: 140px 140px 1fr 140px 80px;
+            gap: 6px;
+            align-items: center;
         }
 
         .emergency-btn {
-            flex: 1;
-            padding: 15px;
-            border: 3px solid #0f0;
+            padding: 10px;
+            border: 2px solid #0f0;
             background: rgba(0, 255, 0, 0.1);
             color: #0f0;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: bold;
-            letter-spacing: 3px;
+            letter-spacing: 2px;
             cursor: pointer;
             transition: all 0.1s;
         }
 
         .emergency-btn:active {
             background: rgba(0, 255, 0, 0.3);
-            box-shadow: inset 0 0 20px #0f0;
+            box-shadow: inset 0 0 10px #0f0;
         }
 
-        .cycle-section {
-            border: 2px solid #0f0;
-            padding: 8px;
-            background: rgba(0, 255, 0, 0.02);
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 8px;
-        }
-
-        .cycle-column {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .cycle-label {
-            font-size: 10px;
-            letter-spacing: 1px;
+        .pos-indicator {
+            font-size: 8px;
             text-align: center;
-            padding: 3px;
-            border-bottom: 1px solid #0f0;
-        }
-
-        .position-indicator {
-            font-size: 9px;
-            text-align: center;
-            padding: 3px;
+            padding: 2px 4px;
             border: 1px solid #0f0;
             background: rgba(0, 255, 0, 0.05);
-            min-height: 20px;
+            display: inline-block;
+            margin-top: 2px;
+            min-width: 50px;
         }
 
-        .position-recorded {
-            background: rgba(0, 255, 0, 0.15);
+        .pos-recorded {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+
+        .interval-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .interval-label {
+            font-size: 9px;
+            letter-spacing: 1px;
+            white-space: nowrap;
         }
 
         .interval-input {
-            width: 100%;
-            padding: 8px;
-            border: 2px solid #0f0;
+            width: 50px;
+            padding: 4px;
+            border: 1px solid #0f0;
             background: rgba(0, 0, 0, 0.5);
             color: #0f0;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 11px;
             text-align: center;
         }
 
@@ -442,15 +438,16 @@ HTML_TEMPLATE = """
         }
 
         .cycle-btn {
-            padding: 8px;
+            padding: 10px;
             border: 2px solid #0f0;
             background: rgba(0, 255, 0, 0.05);
             color: #0f0;
             font-family: 'Courier New', monospace;
-            font-size: 11px;
+            font-size: 10px;
             cursor: pointer;
             letter-spacing: 1px;
             transition: all 0.1s;
+            white-space: nowrap;
         }
 
         .cycle-btn:disabled {
@@ -533,27 +530,21 @@ HTML_TEMPLATE = """
         </div>
 
         <div class="footer">
-            <button class="emergency-btn" onclick="emergencyStop()">[ RETURN TO CENTER ]</button>
-        </div>
-
-        <!-- Position Cycling Controls -->
-        <div class="cycle-section">
-            <div class="cycle-column">
-                <div class="cycle-label">POSITION 1</div>
-                <button class="cycle-btn" onclick="recordPosition(1)">RECORD</button>
-                <div class="position-indicator" id="pos1-indicator">NOT SET</div>
+            <button class="cycle-btn" onclick="recordPosition(1)">
+                REC POS1<br>
+                <span class="pos-indicator" id="pos1-indicator">NOT SET</span>
+            </button>
+            <button class="cycle-btn" onclick="recordPosition(2)">
+                REC POS2<br>
+                <span class="pos-indicator" id="pos2-indicator">NOT SET</span>
+            </button>
+            <div class="interval-group">
+                <span class="interval-label">CYCLE:</span>
+                <input type="number" class="interval-input" id="interval-input" value="15" min="1" max="300" step="0.5">
+                <span class="interval-label">SEC</span>
             </div>
-            <div class="cycle-column">
-                <div class="cycle-label">POSITION 2</div>
-                <button class="cycle-btn" onclick="recordPosition(2)">RECORD</button>
-                <div class="position-indicator" id="pos2-indicator">NOT SET</div>
-            </div>
-            <div class="cycle-column">
-                <div class="cycle-label">CYCLE CONTROL</div>
-                <input type="number" class="interval-input" id="interval-input" value="15" min="1" max="300" step="0.5" placeholder="Interval (s)">
-                <button class="cycle-btn" id="cycle-btn" onclick="toggleCycle()" disabled>START CYCLE</button>
-                <button class="cycle-btn" onclick="clearPositions()">CLEAR</button>
-            </div>
+            <button class="cycle-btn" id="cycle-btn" onclick="toggleCycle()" disabled>START</button>
+            <button class="emergency-btn" onclick="emergencyStop()">CENTER</button>
         </div>
     </div>
 
@@ -952,19 +943,19 @@ HTML_TEMPLATE = """
             const cycleBtn = document.getElementById('cycle-btn');
 
             if (recordedPositions.position_1) {
-                pos1Indicator.textContent = 'RECORDED';
-                pos1Indicator.classList.add('position-recorded');
+                pos1Indicator.textContent = '✓ SET';
+                pos1Indicator.classList.add('pos-recorded');
             } else {
                 pos1Indicator.textContent = 'NOT SET';
-                pos1Indicator.classList.remove('position-recorded');
+                pos1Indicator.classList.remove('pos-recorded');
             }
 
             if (recordedPositions.position_2) {
-                pos2Indicator.textContent = 'RECORDED';
-                pos2Indicator.classList.add('position-recorded');
+                pos2Indicator.textContent = '✓ SET';
+                pos2Indicator.classList.add('pos-recorded');
             } else {
                 pos2Indicator.textContent = 'NOT SET';
-                pos2Indicator.classList.remove('position-recorded');
+                pos2Indicator.classList.remove('pos-recorded');
             }
 
             // Enable/disable cycle button
@@ -973,10 +964,10 @@ HTML_TEMPLATE = """
 
             // Update cycle button text and style
             if (cycleActive) {
-                cycleBtn.textContent = 'STOP CYCLE';
+                cycleBtn.textContent = 'STOP';
                 cycleBtn.classList.add('active');
             } else {
-                cycleBtn.textContent = 'START CYCLE';
+                cycleBtn.textContent = 'START';
                 cycleBtn.classList.remove('active');
             }
         }
